@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cake Mart | Village Fresh</title>
+    <style>
+        :root { --primary: #d81b60; --light: #fff5f8; --success: #27ae60; --white: #ffffff; --info: #2196F3; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--light); color: #333; overflow-x: hidden; }
+
+        /* Hero Page */
+        #hero-page {
+            height: 100vh; display: flex; flex-direction: column; justify-content: center;
+            align-items: center; text-align: center;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1000');
+            background-size: cover; background-position: center; color: white; padding: 20px;
+        }
+        .start-btn { margin-top: 25px; background: var(--primary); color: white; padding: 18px 60px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer; font-size: 1.2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+
+        #main-app { display: none; }
+        
+        /* Navigation Tabs - Search Bar Removed */
+        .nav-container { position: sticky; top: 0; z-index: 1000; background: var(--white); display: flex; overflow-x: auto; padding: 15px 10px; gap: 8px; border-bottom: 2px solid #eee; scrollbar-width: none; }
+        .nav-container::-webkit-scrollbar { display: none; }
+        .nav-btn { padding: 10px 22px; background: var(--white); border: 2px solid var(--primary); border-radius: 25px; white-space: nowrap; color: var(--primary); font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.7rem; }
+        .nav-btn.active { background: var(--primary); color: var(--white); }
+
+        /* Menu Display */
+        .tab-section { display: none; padding-bottom: 450px; }
+        .tab-section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .menu-item { background: var(--white); margin: 0 10px 2px; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; }
+        .item-info { flex: 1; }
+        .item-name { font-weight: 700; display: block; color: #333; font-size: 1rem; }
+        .item-price { color: var(--primary); font-weight: 600; font-size: 0.9rem; }
+
+        .qty-wrap { display: flex; align-items: center; gap: 15px; background: #fdf2f5; padding: 5px 10px; border-radius: 30px; border: 1px solid #ffe1eb; }
+        .qty-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--primary); color: white; font-weight: 900; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
+        .qty-val { font-weight: 800; min-width: 20px; text-align: center; }
+
+        /* Order Panel */
+        #order-panel {
+            position: fixed; bottom: 0; width: 100%; background: var(--white);
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.2); display: none;
+            padding: 20px; border-radius: 30px 30px 0 0; z-index: 2000;
+        }
+        .input-field { width: 100%; padding: 14px; margin-bottom: 10px; border: 1.5px solid #ddd; border-radius: 12px; font-size: 1rem; outline: none; }
+        .loc-btn { background: var(--info); color: white; border: none; padding: 16px; border-radius: 12px; font-weight: 800; width: 100%; cursor: pointer; margin-bottom: 10px; }
+        .confirm-btn { background: var(--success); color: white; border: none; padding: 18px; border-radius: 12px; font-weight: 800; width: 100%; font-size: 1.2rem; cursor: pointer; display: none; }
+        
+        #loc-status { display: none; background: #e3f2fd; color: #1565c0; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem; }
+        .bill-details { background: #f9f9f9; padding: 12px; border-radius: 12px; text-align: center; }
+        .grand-total { font-weight: 900; color: var(--primary); font-size: 1.3rem; display: block; margin-top: 5px; }
+        .bill-breakdown { font-size: 0.85rem; color: #666; }
+    </style>
+</head>
+<body>
+
+    <div id="hero-page">
+        <h1 style="font-size: 3rem; margin: 0;">CAKE MART</h1>
+        <p style="letter-spacing: 4px;">VILLAGE FRESH & SWEETS</p>
+        <button class="start-btn" onclick="openApp()">START ORDERING</button>
+    </div>
+
+    <div id="main-app">
+        <div class="nav-container" id="nav-tabs"></div>
+        <div id="menu-container"></div>
+    </div>
+
+    <div id="order-panel">
+        <input type="text" id="cust-name" class="input-field" placeholder="Your Name">
+        <input type="number" id="cust-phone" class="input-field" placeholder="Phone Number">
+        <div id="loc-status">Checking GPS...</div>
+        <button class="loc-btn" id="loc-btn" onclick="askLocation()">📍 SHARE DELIVERY LOCATION</button>
+        <button class="confirm-btn" id="confirm-btn" onclick="sendOrder()">CONFIRM ORDER</button>
+        <div class="bill-details">
+            <div class="bill-breakdown">Items: ₹<span id="items-total">0</span> | Delivery: ₹<span id="delivery-charge">0</span></div>
+            <span class="grand-total">Total: ₹<span id="bill-total">0</span></span>
+        </div>
+    </div>
+
+<script>
+    let cart = {};
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzhr6y28m_185tLZIotXLcx00thGIrKNYDWSiXDVNDGgG3FdmbG44NBKx48otg2e__D/exec";
+
+    const database = {
+        fried_chicken: [
+            { name: "Fried Chicken (2 PCS)", p: 110 },
+            { name: "Fried Chicken (4 PCS)", p: 200 },
+            { name: "Fried Chicken (8 PCS)", p: 380 }
+        ],
+        wrap_sandwich: [
+            { name: "Tortilla Wrap (Chicken)", p: 100 },
+            { name: "Tortilla Wrap (Veg)", p: 100 },
+            { name: "Paratta Wrap (Chicken)", p: 100 },
+            { name: "Paratta Wrap (Veg)", p: 100 }
+        ],
+        chicken_pizza: [
+            { name: "Normal Chicken Pizza", p: 200 },
+            { name: "SP chicken pizza", p: 240 },
+            { name: "Butter Chicken Pizza", p: 240 },
+            { name: "BBQ Chicken Pizza", p: 230 },
+            { name: "Extra Cheese (Non-Veg)", p: 30 }
+        ],
+        veg_pizza: [
+            { name: "Normal Veg Pizza", p: 150 },
+            { name: "SP Pizza", p: 220 },
+            { name: "Tomato Pizza", p: 180 },
+            { name: "Sweet Corn Pizza", p: 180 },
+            { name: "Onion Pizza", p: 150 },
+            { name: "Onion Capsicum Pizza", p: 180 },
+            { name: "Plane Cheese Pizza", p: 180 },
+            { name: "Paneer Pizza", p: 180 },
+            { name: "Veg Overload Pizza", p: 220 },
+            { name: "Extra Cheese (Veg)", p: 30 }
+        ],
+        burger: [
+            { name: "Veg Burger", p: 80 },
+            { name: "Veg cheese Burger", p: 100 },
+            { name: "Sweet Corn Burger", p: 90 },
+            { name: "Paneer Burger", p: 90 },
+            { name: "Chicken Burger", p: 110 },
+            { name: "Chicken cheese Burger", p: 120 },
+            { name: "Zingar chicken Burger", p: 160 },
+            { name: "Extra cheese", p: 30 }
+        ],
+        club_sandwich: [
+            { name: "Veg Sandwich (Club)", p: 100 },
+            { name: "Paneer Sandwich (Club)", p: 120 },
+            { name: "Chicken Sandwich (Club)", p: 140 }
+        ],
+        samoona_sandwich: [
+            { name: "Veg Sandwich (Samoona)", p: 70 },
+            { name: "Veg Cheese Sandwich (Samoona)", p: 90 },
+            { name: "Chicken Sandwich (Samoona)", p: 80 },
+            { name: "Chicken Cheese Sandwich (Samoona)", p: 100 }
+        ],
+        puffs: [
+            { name: "Egg Puff", p: 20 },
+            { name: "Paneer Puff", p: 25 },
+            { name: "Veg Puff", p: 20 }
+        ],
+        chats: [
+            { name: "French Fries", p: 80 },
+            { name: "Masala Fries", p: 90 },
+            { name: "Loaded Fries", p: 120 },
+            { name: "Chicken Nuggets 5Pcs", p: 100 },
+            { name: "Veg Nuggets 5Pcs", p: 90 },
+            { name: "Veg Finger 5Pcs", p: 90 },
+            { name: "Momos Veg 5Pcs", p: 90 },
+            { name: "Momos Chicken 5Pcs", p: 100 },
+            { name: "Shawarma", p: 120 }
+        ],
+        scoopso_icecream: [
+            { name: "Vanila", p: 50 },
+            { name: "Cocolate", p: 60 },
+            { name: "Strawberry", p: 50 },
+            { name: "Butterscotch", p: 60 }
+        ],
+        falooda: [
+            { name: "Normal Falooda", p: 90 },
+            { name: "SP Falooda", p: 130 },
+            { name: "Pista Falooda", p: 130 },
+            { name: "Royal Falooda", p: 140 },
+            { name: "Dry Fruits Falooda", p: 140 }
+        ],
+        cold: [
+            { name: "Boost Cold", p: 70 },
+            { name: "Coffee Cold", p: 70 },
+            { name: "Badam Cold", p: 70 },
+            { name: "Horlicks Cold", p: 70 }
+        ],
+        crush: [
+            { name: "Vanila Crush", p: 70 },
+            { name: "Pista", p: 80 },
+            { name: "Strawberry", p: 70 },
+            { name: "Mango", p: 70 },
+            { name: "Blue Berry", p: 70 },
+            { name: "Guava", p: 70 }
+        ],
+        fresh_fruit_juice: [
+            { name: "Watermelon", p: 60 },
+            { name: "Pineapple", p: 60 },
+            { name: "Orange", p: 60 },
+            { name: "Papaya", p: 60 },
+            { name: "Anar", p: 70 },
+            { name: "Apple", p: 80 },
+            { name: "Mango", p: 60 },
+            { name: "Guava", p: 60 },
+            { name: "Grape", p: 60 }
+        ],
+        fresh_fruit_milk_shake: [
+            { name: "Papaya Shake", p: 80 },
+            { name: "Mango Shake", p: 80 },
+            { name: "Anar Shake", p: 80 },
+            { name: "Chikku Shake", p: 80 },
+            { name: "Apple Shake", p: 80 },
+            { name: "Mixed Fruit Shake", p: 80 },
+            { name: "Kiwi Shake", p: 80 },
+            { name: "Tender Shake", p: 80 },
+            { name: "Passion Fruit Shake", p: 80 },
+            { name: "Blueberry Shake", p: 80 },
+            { name: "Strawberry Shake", p: 80 }
+        ],
+        biscuit_and_chocolate: [
+            { name: "Orio", p: 80 },
+            { name: "Dark Fantacy", p: 80 },
+            { name: "Dairy Milk", p: 80 },
+            { name: "Five Star", p: 80 },
+            { name: "Kitkat", p: 80 }
+        ],
+        fruits_salad: [
+            { name: "Fruits salad", p: 80 },
+            { name: "SP Fruits Salad", p: 100 },
+            { name: "Royal Fruit Salad", p: 130 }
+        ],
+        dry_fruits: [
+            { name: "Dry Fruits Shake", p: 120 },
+            { name: "Dates Shakes", p: 110 },
+            { name: "Badam Shake", p: 100 }
+        ],
+        lime: [
+            { name: "Fresh Lime", p: 25 },
+            { name: "SP Sarbath", p: 40 },
+            { name: "Mint Lime", p: 40 },
+            { name: "Chilli Lime", p: 30 },
+            { name: "Ginger Lime", p: 30 },
+            { name: "Pineapple Lime", p: 30 },
+            { name: "Blue Lime", p: 30 },
+            { name: "Strawberry Lime", p: 40 },
+            { name: "Orange Lime", p: 30 },
+            { name: "Milk Sarbath", p: 50 }
+        ],
+        soda: [
+            { name: "Soda Salt", p: 25 },
+            { name: "Soda Sweet", p: 30 },
+            { name: "Soda Sweet & Salt", p: 30 },
+            { name: "Chilli Soda", p: 30 },
+            { name: "Strawberry Soda", p: 30 },
+            { name: "Green Apple Soda", p: 30 },
+            { name: "Pineapple Soda", p: 30 },
+            { name: "Orange Soda", p: 30 },
+            { name: "Soda Sarbath", p: 40 }
+        ],
+        mojito: [
+            { name: "Blue Lagone Mojito", p: 70 },
+            { name: "Green Apple Mojito", p: 70 },
+            { name: "Kiwi Mojito", p: 70 },
+            { name: "Blue Berry Mojito", p: 70 },
+            { name: "Strawberry Mojito", p: 70 },
+            { name: "Watermelon Mojito", p: 70 },
+            { name: "Guva Mojito", p: 70 },
+            { name: "Pineapple Mojito", p: 70 },
+            { name: "Passion Fruit Mojito", p: 100 }
+        ],
+        lassi: [
+            { name: "Lassi Plain", p: 50 },
+            { name: "Mango Lassi", p: 50 },
+            { name: "Pista Lassi", p: 70 },
+            { name: "Strawberry Lassi", p: 50 },
+            { name: "Pineapple Lassi", p: 50 },
+            { name: "Banana Lassi", p: 50 },
+            { name: "Passion Fruit Lassi", p: 80 }
+        ]
+    };
+
+    function openApp() {
+        document.getElementById('hero-page').style.display = 'none';
+        document.getElementById('main-app').style.display = 'block';
+        initMenu();
+    }
+
+    function initMenu() {
+        const nav = document.getElementById('nav-tabs');
+        const container = document.getElementById('menu-container');
+        let first = true;
+
+        for (let cat in database) {
+            const btn = document.createElement('div');
+            btn.className = `nav-btn ${first ? 'active' : ''}`;
+            btn.innerText = cat.replace(/_/g, ' ');
+            btn.onclick = (e) => switchTab(cat, e.target);
+            nav.appendChild(btn);
+
+            const section = document.createElement('div');
+            section.id = cat;
+            section.className = `tab-section ${first ? 'active' : ''}`;
+            
+            database[cat].forEach(item => {
+                section.innerHTML += `
+                    <div class="menu-item">
+                        <div class="item-info">
+                            <span class="item-name">${item.name}</span>
+                            <span class="item-price">₹${item.p}</span>
+                        </div>
+                        <div class="qty-wrap">
+                            <button class="qty-btn" onclick="changeQty('${item.name}', ${item.p}, -1, this)">-</button>
+                            <span class="qty-val">0</span>
+                            <button class="qty-btn" onclick="changeQty('${item.name}', ${item.p}, 1, this)">+</button>
+                        </div>
+                    </div>`;
+            });
+            container.appendChild(section);
+            first = false;
+        }
+    }
+
+    function switchTab(id, btn) {
+        document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        btn.classList.add('active');
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+
+    function changeQty(name, price, delta, btn) {
+        const valEl = btn.parentElement.querySelector('.qty-val');
+        let current = (parseInt(valEl.innerText) || 0) + delta;
+        if(current < 0) current = 0;
+        valEl.innerText = current;
+
+        if(current > 0) cart[name] = { q: current, p: price };
+        else delete cart[name];
+        
+        updateBill();
+    }
+
+    function updateBill() {
+        let itemsTotal = 0;
+        for(let id in cart) itemsTotal += (cart[id].q * cart[id].p);
+        
+        let deliveryCharge = 0;
+        if (itemsTotal > 0) {
+            deliveryCharge = itemsTotal < 100 ? 15 : Math.round(itemsTotal * 0.15);
+        }
+
+        const grandTotal = itemsTotal + deliveryCharge;
+
+        document.getElementById('items-total').innerText = itemsTotal;
+        document.getElementById('delivery-charge').innerText = deliveryCharge;
+        document.getElementById('bill-total').innerText = grandTotal;
+        document.getElementById('order-panel').style.display = itemsTotal > 0 ? 'block' : 'none';
+    }
+
+    function askLocation() {
+        if (navigator.geolocation) {
+            document.getElementById('loc-status').style.display = 'block';
+            navigator.geolocation.getCurrentPosition((pos) => {
+                document.getElementById('loc-status').innerText = "✅ Location Locked";
+                document.getElementById('loc-btn').style.display = 'none';
+                document.getElementById('confirm-btn').style.display = 'block';
+            }, () => { alert("Please enable GPS to order"); });
+        }
+    }
+
+    function sendOrder() {
+        const name = document.getElementById('cust-name').value;
+        const phone = document.getElementById('cust-phone').value;
+        if(!name || !phone) return alert("Please enter Name and Phone");
+
+        let orderSummary = "";
+        for(let item in cart) {
+            orderSummary += `${item} (x${cart[item].q}), `;
+        }
+
+        const itemsTotal = document.getElementById('items-total').innerText;
+        const deliveryCharge = document.getElementById('delivery-charge').innerText;
+        const grandTotal = document.getElementById('bill-total').innerText;
+
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("phone", phone);
+        formData.append("order", orderSummary);
+        formData.append("items_total", itemsTotal);
+        formData.append("delivery_charge", deliveryCharge);
+        formData.append("total", grandTotal);
+
+        document.getElementById('confirm-btn').innerText = "SENDING...";
+        document.getElementById('confirm-btn').disabled = true;
+
+        fetch(SCRIPT_URL, { method: 'POST', body: formData })
+        .then(() => {
+            alert("Success! Your order has been placed.");
+            location.reload();
+        })
+        .catch(err => {
+            alert("Error sending order. Please check internet.");
+            document.getElementById('confirm-btn').innerText = "CONFIRM ORDER";
+            document.getElementById('confirm-btn').disabled = false;
+        });
+    }
+</script>
+</body>
+</html>
