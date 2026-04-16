@@ -20,13 +20,11 @@
 
         #main-app { display: none; }
         
-        /* Navigation Tabs - Search Bar Removed */
         .nav-container { position: sticky; top: 0; z-index: 1000; background: var(--white); display: flex; overflow-x: auto; padding: 15px 10px; gap: 8px; border-bottom: 2px solid #eee; scrollbar-width: none; }
         .nav-container::-webkit-scrollbar { display: none; }
         .nav-btn { padding: 10px 22px; background: var(--white); border: 2px solid var(--primary); border-radius: 25px; white-space: nowrap; color: var(--primary); font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.7rem; }
         .nav-btn.active { background: var(--primary); color: var(--white); }
 
-        /* Menu Display */
         .tab-section { display: none; padding-bottom: 450px; }
         .tab-section.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -40,7 +38,6 @@
         .qty-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--primary); color: white; font-weight: 900; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
         .qty-val { font-weight: 800; min-width: 20px; text-align: center; }
 
-        /* Order Panel */
         #order-panel {
             position: fixed; bottom: 0; width: 100%; background: var(--white);
             box-shadow: 0 -10px 30px rgba(0,0,0,0.2); display: none;
@@ -53,7 +50,6 @@
         #loc-status { display: none; background: #e3f2fd; color: #1565c0; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem; }
         .bill-details { background: #f9f9f9; padding: 12px; border-radius: 12px; text-align: center; }
         .grand-total { font-weight: 900; color: var(--primary); font-size: 1.3rem; display: block; margin-top: 5px; }
-        .bill-breakdown { font-size: 0.85rem; color: #666; }
     </style>
 </head>
 <body>
@@ -76,13 +72,14 @@
         <button class="loc-btn" id="loc-btn" onclick="askLocation()">📍 SHARE DELIVERY LOCATION</button>
         <button class="confirm-btn" id="confirm-btn" onclick="sendOrder()">CONFIRM ORDER</button>
         <div class="bill-details">
-            <div class="bill-breakdown">Items: ₹<span id="items-total">0</span> | Delivery: ₹<span id="delivery-charge">0</span></div>
+            <div>Items: ₹<span id="items-total">0</span> | Delivery: ₹<span id="delivery-charge">0</span></div>
             <span class="grand-total">Total: ₹<span id="bill-total">0</span></span>
         </div>
     </div>
 
 <script>
     let cart = {};
+    let finalLocationLink = "Not Provided";
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzhr6y28m_185tLZIotXLcx00thGIrKNYDWSiXDVNDGgG3FdmbG44NBKx48otg2e__D/exec";
 
     const database = {
@@ -145,7 +142,6 @@
         chats: [
             { name: "French Fries", p: 80 },
             { name: "Masala Fries", p: 90 },
-            { name: "Loaded Fries", p: 120 },
             { name: "Chicken Nuggets 5Pcs", p: 100 },
             { name: "Veg Nuggets 5Pcs", p: 90 },
             { name: "Veg Finger 5Pcs", p: 90 },
@@ -324,10 +320,10 @@
         if(current > 0) cart[name] = { q: current, p: price };
         else delete cart[name];
         
-        updateBill();
+        updateTotal();
     }
 
-    function updateBill() {
+    function updateTotal() {
         let itemsTotal = 0;
         for(let id in cart) itemsTotal += (cart[id].q * cart[id].p);
         
@@ -337,7 +333,6 @@
         }
 
         const grandTotal = itemsTotal + deliveryCharge;
-
         document.getElementById('items-total').innerText = itemsTotal;
         document.getElementById('delivery-charge').innerText = deliveryCharge;
         document.getElementById('bill-total').innerText = grandTotal;
@@ -348,45 +343,46 @@
         if (navigator.geolocation) {
             document.getElementById('loc-status').style.display = 'block';
             navigator.geolocation.getCurrentPosition((pos) => {
-                document.getElementById('loc-status').innerText = "✅ Location Locked";
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                finalLocationLink = `https://www.google.com/maps?q=${lat},${lon}`;
+                document.getElementById('loc-status').innerText = "✅ Location Shared";
                 document.getElementById('loc-btn').style.display = 'none';
                 document.getElementById('confirm-btn').style.display = 'block';
-            }, () => { alert("Please enable GPS to order"); });
+            }, () => { alert("Please enable GPS/Location in your settings."); });
         }
     }
 
     function sendOrder() {
         const name = document.getElementById('cust-name').value;
         const phone = document.getElementById('cust-phone').value;
-        if(!name || !phone) return alert("Please enter Name and Phone");
+        if(!name || !phone) return alert("Please fill in Name and Phone");
 
-        let orderSummary = "";
+        let orderText = "";
         for(let item in cart) {
-            orderSummary += `${item} (x${cart[item].q}), `;
+            orderText += `${item} (x${cart[item].q})\n`;
         }
 
-        const itemsTotal = document.getElementById('items-total').innerText;
-        const deliveryCharge = document.getElementById('delivery-charge').innerText;
-        const grandTotal = document.getElementById('bill-total').innerText;
-
         const formData = new FormData();
-        formData.append("name", name);
+        formData.append("hotel_name", "CAKE MART | VILLAGE FRESH");
+        formData.append("customer_name", name);
         formData.append("phone", phone);
-        formData.append("order", orderSummary);
-        formData.append("items_total", itemsTotal);
-        formData.append("delivery_charge", deliveryCharge);
-        formData.append("total", grandTotal);
+        formData.append("order_details", orderText);
+        formData.append("items_total", "₹" + document.getElementById('items-total').innerText);
+        formData.append("delivery_charge", "₹" + document.getElementById('delivery-charge').innerText);
+        formData.append("grand_total", "₹" + document.getElementById('bill-total').innerText);
+        formData.append("location_link", finalLocationLink);
 
         document.getElementById('confirm-btn').innerText = "SENDING...";
         document.getElementById('confirm-btn').disabled = true;
 
         fetch(SCRIPT_URL, { method: 'POST', body: formData })
         .then(() => {
-            alert("Success! Your order has been placed.");
+            alert("Order Successful!");
             location.reload();
         })
         .catch(err => {
-            alert("Error sending order. Please check internet.");
+            alert("Error sending order. Check Internet.");
             document.getElementById('confirm-btn').innerText = "CONFIRM ORDER";
             document.getElementById('confirm-btn').disabled = false;
         });
